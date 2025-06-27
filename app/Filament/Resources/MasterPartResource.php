@@ -3,7 +3,6 @@
 namespace App\Filament\Resources;
 
 use App\Filament\Resources\MasterPartResource\Pages;
-use App\Filament\Resources\MasterPartResource\RelationManagers;
 use App\Models\MasterPart;
 use Filament\Forms;
 use Filament\Forms\Form;
@@ -11,9 +10,9 @@ use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Database\Eloquent\SoftDeletingScope;
 use Filament\Tables\Filters\Filter;
-
+use Filament\Forms\Components\Placeholder;
+use Illuminate\Support\Str;
 
 class MasterPartResource extends Resource
 {
@@ -27,38 +26,67 @@ class MasterPartResource extends Resource
         return $form
             ->schema([
                 Forms\Components\TextInput::make('part_number')
+                    ->label('Part Number')
+                    ->default(function () { // Fungsi untuk generate default value
+                        $prefix = 'PART-';
+                        do {
+                            $randomPart = strtoupper(Str::random(6)); // 6 karakter acak uppercase
+                            $partNumber = $prefix . $randomPart;
+                        } while (MasterPart::where('part_number', $partNumber)->exists()); // Cek keunikan
+                        return $partNumber;
+                    })
                     ->required()
-                    ->maxLength(255)
-                    // Jika Anda ingin field ini readonly saat edit, tambahkan ->disabledOn('edit'),
-                    // tapi untuk impor, ini adalah kunci utama.
-                    ->label('Nomor Part'),
+                    ->maxLength(255) // Cukup untuk PART-XXXXXX
+                    ->disabled()     // Nonaktifkan field agar pengguna tidak bisa mengubah
+                    ->dehydrated()   // Pastikan nilai tetap dikirim meski disabled
+                    ->unique(MasterPart::class, 'part_number', ignoreRecord: true), // Validasi keunikan di server
                 Forms\Components\TextInput::make('part_name')
                     ->required()
                     ->maxLength(255)
-                    ->label('Nama Part'),
+                    ->label('Part Name'),
+
+                // For CREATE form context
+                Placeholder::make('part_price_info_create')
+                    ->label('Part Price')
+                    ->content('The part price will be automatically calculated based on its sub parts after creation and adding sub parts.')
+                    ->visibleOn('create'),
+
+                // For EDIT form context
                 Forms\Components\TextInput::make('part_price')
-                    ->required()
+                    ->label('Current Total Price (Auto-calculated)')
                     ->numeric()
-                    ->prefix('Rp')
-                    ->label('Harga Part'),
+                    ->disabled() // Always disabled as it's calculated
+                    ->dehydrated(false) // Ensures it's not saved back
+                    ->visibleOn('edit'), // Only show on edit form
+
+                // This placeholder is also good for edit, shows live sum if possible
+                Placeholder::make('calculated_price_on_edit')
+                    ->label('Calculated Price (from Sub Parts)')
+                    ->content(function (?MasterPart $record): string {
+                        if ($record) {
+                            return number_format($record->subParts()->sum('price'), 2) . ' (Stored: ' . number_format($record->part_price, 2) . ')';
+                        }
+                        return 'N/A';
+                    })
+                    ->visibleOn('edit'),
             ]);
     }
 
     public static function table(Table $table): Table
     {
-        return $table
+         return $table
             ->columns([
                 Tables\Columns\TextColumn::make('part_number')
                     ->searchable()
                     ->sortable()
-                    ->label('Nomor Part'),
+                    ->label('Part Number'),
                 Tables\Columns\TextColumn::make('part_name')
                     ->searchable()
-                    ->label('Nama Part'),
+                    ->label('Part Name'),
                 Tables\Columns\TextColumn::make('part_price')
                     ->money('IDR')
                     ->sortable()
-                    ->label('Harga Part'),
+                    ->label('Total Price'),
                 Tables\Columns\TextColumn::make('created_at')
                     ->dateTime()
                     ->sortable()
@@ -77,13 +105,13 @@ class MasterPartResource extends Resource
                     ->query(fn (Builder $query): Builder => $query->where('part_price', '<=', 100000)),
             ])
             ->actions([
-                Tables\Actions\EditAction::make(), // Biarkan EditAction jika masih diperlukan
-                \Filament\Tables\Actions\Action::make('viewDetails') // Aksi lihat detail Anda
-                    ->label('View Detail')
+                Tables\Actions\EditAction::make(),
+                \Filament\Tables\Actions\Action::make('viewSubParts')
+                    ->label('Manage Sub Parts')
                     ->icon('heroicon-m-eye')
-                    ->url(fn ($record) => route('filament.admin.resources.master-parts.sub-parts', ['part_number' => $record->part_number]))
+                    ->url(fn ($record): string => static::getUrl('sub-parts', ['part_number' => $record->part_number]))
                     ->openUrlInNewTab(),
-                Tables\Actions\DeleteAction::make(), // Tambahkan DeleteAction jika diperlukan
+                Tables\Actions\DeleteAction::make(),
             ])
             ->bulkActions([
                 Tables\Actions\BulkActionGroup::make([
@@ -96,6 +124,8 @@ class MasterPartResource extends Resource
     {
         return [
             //
+            // If you decide to use a Relation Manager later, add it here.
+            // Example: RelationManagers\SubPartsRelationManager::class,
         ];
     }
 
@@ -103,7 +133,7 @@ class MasterPartResource extends Resource
     {
         return [
             'index' => Pages\ListMasterParts::route('/'),
-            //'create' => Pages\CreateMasterPart::route('/create'),
+            'create' => Pages\CreateMasterPart::route('/create'),
             'edit' => Pages\EditMasterPart::route('/{record}/edit'),
             'sub-parts' => Pages\ViewSubParts::route('/{part_number}/sub-parts'),
         ];

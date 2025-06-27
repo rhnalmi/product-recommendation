@@ -1,30 +1,21 @@
-<x-filament::page>
-    <h2 class="text-2xl font-bold mb-4">
-        Sub Parts for: {{ $this->masterPart->part_name }} ({{ $this->masterPart->part_number }})
-    </h2>
-
-    <div class="overflow-x-auto">
-        <table class="min-w-full divide-y divide-gray-200 border border-gray-300">
-            <thead class="bg-gray-200">
-                <tr>
-                    <th class="px-4 py-2 text-left text-xs font-bold text-gray-700 uppercase">Sub Part Number</th>
-                    <th class="px-4 py-2 text-left text-xs font-bold text-gray-700 uppercase">Sub Part Name</th>
-                    <th class="px-4 py-2 text-left text-xs font-bold text-gray-700 uppercase">Price</th>
-                </tr>
-            </thead>
-            <tbody>
-                @forelse ($this->masterPart->subParts as $subPart)
-                    <tr class="odd:bg-white even:bg-gray-50">
-                        <td class="px-4 py-2 text-gray-900">{{ $subPart->sub_part_number }}</td>
-                        <td class="px-4 py-2 text-gray-900">{{ $subPart->sub_part_name }}</td>
-                        <td class="px-4 py-2 text-gray-900">{{ $subPart->price }}</td>
-                    </tr>
-                @empty
-                    <tr>
-                        <td colspan="3" class="px-4 py-2 text-center text-gray-500">No sub parts found.</td>
-                    </tr>
-                @endforelse
-            </tbody>
-        </table>
+<x-filament-panels::page>
+    <div class="mb-6 p-4 border border-gray-300 rounded-md shadow-sm bg-white">
+        <h2 class="text-xl font-semibold text-gray-800 mb-2">Master Part Details</h2>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-x-4">
+            <p><strong>Part Number:</strong> {{ $masterPart->part_number }}</p>
+            <p><strong>Part Name:</strong> {{ $masterPart->part_name }}</p>
+        </div>
+        <p class="mt-1"><strong>Total Calculated Price:</strong>
+            <span class="font-bold text-primary-600">
+                {{-- Assuming part_price is stored with 2 decimal places as per SQL decimal(10,2) --}}
+                IDR {{ number_format($masterPart->part_price, 2, ',', '.') }}
+            </span>
+        </p>
     </div>
-</x-filament::page>
+
+    <h3 class="text-lg font-semibold text-gray-800 mb-3">Sub Parts for: {{ $masterPart->part_name }}</h3>
+
+    {{-- This will render the table defined in your ViewSubParts PHP class --}}
+    {{ $this->table }}
+
+</x-filament-panels::page>
