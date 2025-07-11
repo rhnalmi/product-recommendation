@@ -16,6 +16,11 @@ use App\Filament\Widgets\SalesChart;
 use App\Filament\Widgets\StatsOverview;
 use App\Filament\Widgets\StockAvailabilityWidget;
 use App\Filament\Widgets\TopReturningDealersChart;
+use App\Filament\Widgets\DamagedStockReport;
+use App\Filament\Widgets\Inventory\DeadStockTable;
+use App\Filament\Widgets\InventoryValuation;
+use App\Filament\Widgets\LowStockItemsTable;
+use App\Filament\Widgets\Inventory\SlowMovingItemsChart;
 
 class InventoryDashboard extends Page
 {
@@ -29,6 +34,10 @@ class InventoryDashboard extends Page
         return [
             AfterSalesKpiWidget::class,
             StockAvailabilityWidget::class,
+            
+            SlowMovingItemsChart::class,
+            DeadStockTable::class,
+            
             NewProductReturnsTable::class,
             ReturnReasonChart::class,
             MostReturnedProductsChart::class,
@@ -38,6 +47,10 @@ class InventoryDashboard extends Page
             // Widget baru ditambahkan di sini
             PendingShipmentsTable::class,
             TopReturningDealersChart::class,
+
+            InventoryValuation::class, // <-- TAMBAHKAN INI
+            DamagedStockReport::class, // <-- TAMBAHKAN INI
+            LowStockItemsTable::class, // <-- TAMBAHKAN INI
             ];
     } 
 }

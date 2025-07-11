@@ -1,70 +1,81 @@
 <?php
+// File: app/Filament/Widgets/LowStockItemsTable.php
 
 namespace App\Filament\Widgets;
 
 use Filament\Tables;
 use Filament\Tables\Table;
 use Filament\Widgets\TableWidget as BaseWidget;
-use App\Models\Inventory; // Atau SubPart jika stok ada di sana
-use App\Models\SubPart; // Untuk mendapatkan nama part
+use App\Models\Inventory;
 use Filament\Tables\Columns\TextColumn;
-use Illuminate\Database\Eloquent\Builder;
+use App\Mail\CriticalStockNotification;
+use Illuminate\Support\Facades\Mail;
+use Filament\Tables\Actions\Action;
+// --- TAMBAHKAN USE STATEMENT INI ---
+use Filament\Notifications\Notification;
 
 class LowStockItemsTable extends BaseWidget
 {
     protected static ?int $sort = 2;
-    protected int | string | array $columnSpan = 'full'; // Atau sesuaikan, misal 1 jika ingin 2 kolom
-
-    protected function getTableHeading(): string
-    {
-        return 'Item dengan Stok Menipis';
-    }
+    protected int | string | array $columnSpan = 'full';
 
     public function table(Table $table): Table
     {
-        $lowStockThreshold = 10; // Sesuaikan ambang batas
+        $lowStockThreshold = 10;
+        $inventoryTable = (new Inventory())->getTable();
 
         return $table
             ->query(
-                // Sesuaikan query ini dengan struktur database Anda
                 Inventory::query()
-                    ->join('sub_parts', 'inventories.sub_part_number', '=', 'sub_parts.sub_part_number')
-                    ->join('master_part', 'sub_parts.part_number', '=', 'master_part.part_number') // Join ke master_part untuk nama master
-                    ->where('inventories.quantity', '<', $lowStockThreshold)
-                    ->where('inventories.quantity', '>', 0)
-                    ->select('sub_parts.sub_part_number', 'sub_parts.sub_part_name', 'master_part.part_name as master_part_name', 'inventories.quantity')
-                    ->orderBy('inventories.quantity', 'asc')
-                // Alternatif jika stok ada di SubPart:
-                // SubPart::query()
-                //     ->where('stock_quantity', '<', $lowStockThreshold)
-                //     ->where('stock_quantity', '>', 0)
-                //     ->orderBy('stock_quantity', 'asc')
+                    ->join('sub_parts', "{$inventoryTable}.product_id", '=', 'sub_parts.sub_part_number')
+                    ->join('master_part', 'sub_parts.part_number', '=', 'master_part.part_number')
+                    ->where("{$inventoryTable}.quantity_available", '<', $lowStockThreshold)
+                    ->where("{$inventoryTable}.quantity_available", '>', 0)
+                    ->select(
+                        'sub_parts.sub_part_number',
+                        'sub_parts.sub_part_name',
+                        'master_part.part_name as master_part_name',
+                        "{$inventoryTable}.quantity_available"
+                    )
             )
             ->columns([
-                TextColumn::make('sub_part_number')
-                    ->label('Kode Sub Part')
-                    ->searchable()
-                    ->sortable(),
-                TextColumn::make('sub_part_name')
-                    ->label('Nama Sub Part')
-                    ->searchable()
-                    ->sortable(),
-                TextColumn::make('master_part_name') // Menampilkan nama master part
-                    ->label('Nama Master Part')
-                    ->searchable()
-                    ->sortable(),
-                TextColumn::make('quantity') // atau 'stock_quantity'
-                    ->label('Sisa Stok')
-                    ->numeric()
-                    ->sortable(),
+                TextColumn::make('sub_part_number')->label('Kode Sub Part')->searchable()->sortable(),
+                TextColumn::make('sub_part_name')->label('Nama Sub Part')->searchable()->sortable(),
+                TextColumn::make('master_part_name')->label('Nama Master Part')->searchable()->sortable(),
+                TextColumn::make('quantity_available')->label('Sisa Stok')->numeric()->sortable(),
             ])
-            ->defaultSort('quantity', 'asc') // Atau 'stock_quantity'
-            ->paginated(false); // Nonaktifkan paginasi jika daftarnya pendek
-    }
+            ->defaultSort('quantity_available', 'asc')
+            ->paginated(true)
+            ->headerActions([
+                Action::make('send_notification')
+                    ->label('Kirim Notifikasi Email')
+                    ->icon('heroicon-o-envelope')
+                    ->color('primary')
+                    // --- PERBAIKI BAGIAN ACTION DI BAWAH INI ---
+                    ->action(function () {
+                        $inventoryTableForAction = (new Inventory())->getTable();
+                        $lowStockItems = Inventory::query()
+                            ->join('sub_parts', "{$inventoryTableForAction}.product_id", '=', 'sub_parts.sub_part_number')
+                            ->whereRaw("{$inventoryTableForAction}.quantity_available <= {$inventoryTableForAction}.minimum_stock")
+                            ->where("{$inventoryTableForAction}.quantity_available", '>', 0)
+                            ->select("{$inventoryTableForAction}.product_id", 'sub_parts.sub_part_name', "{$inventoryTableForAction}.quantity_available")
+                            ->get();
 
-    public static function canView(): bool
-    {
-        // Tambahkan logika jika widget ini hanya boleh dilihat oleh role tertentu
-        return true;
+                        if ($lowStockItems->isNotEmpty()) {
+                            Mail::to('mazhar1902@gmail.com')->send(new CriticalStockNotification($lowStockItems));
+                            // Gunakan class Notification untuk mengirim notifikasi sukses
+                            Notification::make()
+                                ->title('Email Terkirim')
+                                ->success()
+                                ->send();
+                        } else {
+                            // Gunakan class Notification untuk mengirim notifikasi info
+                            Notification::make()
+                                ->title('Tidak ada stok kritis untuk dilaporkan')
+                                ->info()
+                                ->send();
+                        }
+                    }),
+            ]);
     }
 }
