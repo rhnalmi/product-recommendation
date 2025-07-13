@@ -9,7 +9,7 @@ use Illuminate\Support\Facades\DB;
 
 class InventoryValuation extends BaseWidget
 {
-    protected static ?int $sort = 2; // Atur prioritasnya di dashboard
+    protected static ?int $sort = 1; // Atur prioritasnya di dashboard
 
     protected function getStats(): array
     {

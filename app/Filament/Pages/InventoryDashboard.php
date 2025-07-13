@@ -48,7 +48,7 @@ class InventoryDashboard extends Page
             PendingShipmentsTable::class,
             TopReturningDealersChart::class,
 
-            InventoryValuation::class, // <-- TAMBAHKAN INI
+            // InventoryValuation::class, // <-- TAMBAHKAN INI
             DamagedStockReport::class, // <-- TAMBAHKAN INI
             LowStockItemsTable::class, // <-- TAMBAHKAN INI
             ];
